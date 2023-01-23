@@ -20,17 +20,38 @@ export const BotTypes = {
 	}
 };
 
-// Intentionally not exported; instantiate subclasses only
+/*
+Class representing a general bot
+@description This is intentionally not exported.  You should only ever instantiate subclasses.
+ */
 class Bot
 {
-	bot; // Set in subclass; polymorphic
-	botType; // Set in subclass
-	//connect; // Implement in subclass; no params
-	dest; // Destination bots; managed in superclass but used in subclass
-	//listen; // Implement in subclass; no params
-	//sendMessage; // Implement in subclass; int index, string msg
-	//exit; // Implement in subclass; no params
+	/*
+	The bot object itself
+	@type {Object}
+	@description This should only be set in subclasses
+	 */
+	bot;
 
+	/*
+	The bot object's type
+	@type {BotTypes}
+	@description This should only be set in subclasses
+	 */
+	botType;
+
+	/*
+	The destination bot
+	@type {Bot}
+	@description This is managed in the superclass (Bot) but is also used in subclasses
+	 */
+	dest;
+
+	/*
+	Formats a message
+	@param {string} sender - The name of the sender
+	@param {string} msg - The message sent
+	 */
 	formatMessage(sender, msg)
 	{
 		if(msg.match(emptyRegex))
@@ -41,16 +62,32 @@ class Bot
 		return `<${sender}> ${msg}`;
 	}
 
+	/*
+	Formats a system message
+	@param {string} event - The event giving rise to this message
+	@param {string} sender - The name of the sender
+	@param {string} msg - The message sent
+	 */
 	formatSystemMessage(event, sender, msg)
 	{
 		return `[${event}] [${sender}] ${msg}`;
 	}
 
+	/*
+	Prints a message
+	@param {string} txt - The text to pront
+	@param {Object} [obj] - An optional object to print
+	 */
 	print(txt, obj = null)
 	{
 		doPrint(this.botType.header, this.botType.colour, txt, obj);
 	}
 
+	/*
+	Prints a debug message
+	@param {string} txt - The text to pront
+	@param {Object} [obj] - An optional object to print
+	 */
 	printDebug(txt, obj = null)
 	{
 		if(debug)
@@ -59,22 +96,67 @@ class Bot
 		}
 	}
 
+	/*
+	Sets the destination bot for messages originating from this bot
+	@param {Bot} dest - The bot to send messages to
+	 */
 	setDest(dest)
 	{
 		this.dest = dest;
 	}
 }
 
+/*
+Class representing a Second Life bot
+@extends Bot
+ */
 export class SLBot
 	extends Bot
 {
+	/*
+	The bot type
+	@type {BotTypes}
+	 */
 	botType = BotTypes.SL;
+
+	/*
+	The Second Life First Name
+	@type {string}
+	 */
 	firstName;
+
+	/*
+	The groups this bot should manage
+	@type {string[]}
+	 */
 	groups;
+
+	/*
+	This bot's UUID
+	@type {string}
+	 */
 	id;
+
+	/*
+	The Second Life Last Name
+	@type {string}
+	 */
 	lastName;
+
+	/*
+	The Second Life Password
+	@type {string}
+	 */
 	password;
 
+	/*
+	Construct an SLBot instance
+	@constructor
+	@param {string} firstName - The Second Life First Name
+	@param {string} lastName - The Second Life Last Name
+	@param {string} password - The Second Life Password
+	@param {string[]} groups - The UUIDs for the groups this bot will manage
+	 */
 	constructor(firstName, lastName, password, groups)
 	{
 		super();
@@ -97,6 +179,10 @@ export class SLBot
 		this.print("Groups: ", this.groups);
 	}
 
+	/*
+	Connects the bot to Second Life
+	@returns {Promise<void>}
+	 */
 	async connect()
 	{
 		const loginParameters = new nmv.LoginParameters();
@@ -115,6 +201,10 @@ export class SLBot
 		this.print("Connected to sim");
 	}
 
+	/*
+	Disconnects the bot
+	@returns {Promise<void>}
+	 */
 	async exit()
 	{
 		this.print("Disconnecting from " + this.botType.header);
@@ -129,6 +219,11 @@ export class SLBot
 		}
 	}
 
+	/*
+	Finds the index of a given group UUID
+	@param {string} groupId - The group UUID
+	@returns {integer} - The index
+	 */
 	findIndex(groupId)
 	{
 		for(let x = 0; x < this.groups.length; x++)
@@ -142,6 +237,10 @@ export class SLBot
 		return -1;
 	}
 
+	/*
+	Starts this bot listening for messages on Second Life
+	@returns {Promise<void>}
+	 */
 	async listen()
 	{
 		this.id = UUID.getString(this.bot.agentID());
@@ -172,6 +271,11 @@ export class SLBot
 		this.print("Listening");
 	}
 
+	/*
+	Group chat event callback
+	@param {object} event - The event
+	@returns {void}
+	 */
 	onGroupChat(event)
 	{
 		this.printDebug("Message sent: ", event);
@@ -202,6 +306,12 @@ export class SLBot
 		this.dest.sendMessage(index, this.formatMessage(sender, text));
 	}
 
+	/*
+	Sends a message to Second Life
+	@param {integer} index - The index of the group to send to
+	@param {string} msg - The message to send
+	@returns {void}
+	 */
 	sendMessage(index, msg)
 	{
 		if(index < 0 || index >= this.groups.length || !msg)
@@ -220,16 +330,56 @@ export class SLBot
 	}
 }
 
+/*
+Class representing a Discord bot
+@extends Bot
+ */
 export class DiscordBot
 	extends Bot
 {
+	/*
+	The bot's type
+	@type {BotTypes}
+	 */
 	botType = BotTypes.DISCORD;
+
+	/*
+	The list of channel snowflake IDs this bot will manage
+	@type {string[]}
+	 */
 	channelSnowflakes;
+
+	/*
+	The list of channels this bot is managing
+	@type {Channel[]}
+	 */
 	channels;
+
+	/*
+	The guild this bot is managing
+	@type {Guild}
+	 */
 	guild;
+
+	/*
+	The guild snowflake id of the guild this bot will manage
+	@type {string}
+	 */
 	guildSnowflake;
+
+	/*
+	The secret token to connect to Discord
+	@type {string}
+	 */
 	token;
 
+	/*
+	Constructs a Discord bot
+	@constructor
+	@param {string} token - The secret token
+	@param {string} guildSnowflake - The snowflake id of the guild to manage
+	@param {string[]} channelSnowflakes - The snowflake ids of the channels to manage
+	 */
 	constructor(token, guildSnowflake, channelSnowflakes)
 	{
 		super();
@@ -242,6 +392,10 @@ export class DiscordBot
 		this.print("Channels: " + this.channelSnowflakes);
 	}
 
+	/*
+	Connect this bot to Discord
+	@returns {Promise<void>}
+	 */
 	async connect()
 	{
 		const Intents = Discord.GatewayIntentBits;
@@ -270,6 +424,10 @@ export class DiscordBot
 		}
 	}
 
+	/*
+	Disconnects this bot from Discord
+	@returns {Promise<void>}
+	 */
 	async exit()
 	{
 		this.print("Disconnecting from " + this.botType.header);
@@ -284,6 +442,11 @@ export class DiscordBot
 		}
 	}
 
+	/*
+	Finds the index of the given snowflake id
+	@param {string} channelSnowflake - The snowflake to find the index of
+	@returns {integer} - The index of the given channel
+	 */
 	findIndex(channelSnowflake)
 	{
 		for(let x = 0; x < this.channelSnowflakes.length; x++)
@@ -297,13 +460,22 @@ export class DiscordBot
 		return -1;
 	}
 
+	/*
+	Gets the display name of a given user
+	@param {string} id - The user's snowflake id
+	@returns {Promise<string>}
+	 */
 	async getDisplayName(id)
 	{
 		this.printDebug("Fetching display name for id " + id);
 		return (await this.guild.members.fetch(id)).displayName;
 	}
 
-	// All promises here ignored because these need to be async
+	/*
+	Starts this bot listening
+	@description All promises returned here are ignored because this code needs to be asynchronous
+	@returns {void}
+	 */
 	listen()
 	{
 		this.bot.on("messageCreate", this.onMessageCreate.bind(this)); // msg
@@ -317,6 +489,11 @@ export class DiscordBot
 		this.print("Listening");
 	}
 
+	/*
+	Called when a message is created/sent
+	@param {Message} msg - The message sent
+	@returns {Promise<void>}
+	 */
 	async onMessageCreate(msg)
 	{
 		this.printDebug("Message sent: ", msg);
@@ -343,6 +520,11 @@ export class DiscordBot
 		this.dest.sendMessage(index, this.formatMessage(sender, text));
 	}
 
+	/*
+	 Called when a message is deleted
+	 @param {Message} msg - The message deleted
+	 @returns {Promise<void>}
+	 */
 	async onMessageDelete(msg)
 	{
 		this.printDebug("Message deleted: ", msg);
@@ -365,7 +547,13 @@ export class DiscordBot
 		this.dest.sendMessage(index, this.formatSystemMessage("Deleted", sender, text));
 	}
 
-	// Channel is unused because each message has its own
+	/*
+	 Called when multiple messages are deleted
+	 @description Channel goes unused here because each msg has its own channel
+	 @param {Message[]} msgs - The messages
+	 @param [Channel] channel - The channel the messages were deleted from
+	 @returns {void}
+	 */
 	onMessageDeleteBulk(msgs, channel)
 	{
 		for(const msg of msgs)
@@ -374,6 +562,12 @@ export class DiscordBot
 		}
 	}
 
+	/*
+	 Called when a message is updated
+	 @param {Message} oldMessage - The old message
+	 @param {Message} newMessage - The new message
+	 @returns {Promise<void>}
+	 */
 	async onMessageUpdate(oldMessage, newMessage)
 	{
 		this.printDebug("Message updated from: ", oldMessage);
@@ -400,7 +594,13 @@ export class DiscordBot
 		this.dest.sendMessage(index, this.formatSystemMessage("Changed", sender, `{${oldText}} -> {${newText}}`));
 	}
 
-	// User ignored because it's in the message
+	/*
+	 Called when a reaction is added
+	 @description The user is ignored because it's present in the message
+	 @param {Reaction} reaction - The reaction added
+	 @param {User} [user] - The user who added the reaction
+	 @returns {Promise<void>}
+	 */
 	async onReactionAdd(reaction, user)
 	{
 		this.printDebug("Reaction added: ", reaction);
@@ -425,7 +625,13 @@ export class DiscordBot
 		this.dest.sendMessage(index, this.formatMessage(sender, `:${emoji}: @ {${text}}`));
 	}
 
-	// User ignored because it's in the message
+	/*
+	 Called when a reaction is removed
+	 @description The user is ignored because it's present in the message
+	 @param {Reaction} reaction - The reaction removed
+	 @param {User} [user] - The user who added the reaction
+	 @returns {Promise<void>}
+	 */
 	async onReactionRemove(reaction, user)
 	{
 		this.printDebug("Reaction removed: ", reaction);
@@ -450,6 +656,12 @@ export class DiscordBot
 		this.dest.sendMessage(index, this.formatMessage(sender, `Removed :${emoji}: @ {${text}}`));
 	}
 
+	/*
+	 Called when all reactions are removed
+	 @param {Message} message - The message from which the reactions were deleted
+	 @param {Reaction[]} reactions - The reactions deleted
+	 @returns {void}
+	 */
 	onReactionRemoveAll(message, reactions)
 	{
 		for(const reaction of reactions)
@@ -458,6 +670,11 @@ export class DiscordBot
 		}
 	}
 
+	/*
+	 Called when a bot removes an emoji
+	 @param {Reaction} reaction - The emoji removed
+	 @returns {Promise<void>}
+	 */
 	async onRemoveEmoji(reaction)
 	{
 		this.printDebug("Emoji removed: ", reaction);
@@ -482,6 +699,11 @@ export class DiscordBot
 		this.dest.sendMessage(index, this.formatMessage(sender, `Removed :${emoji}: @ {${text}}`));
 	}
 
+	/*
+	Convert mentions of usernames to actual Discord mentions
+	@param {string} msg - The message to process
+	@returns {Promise<string>}
+	 */
 	async processMentions(msg)
 	{
 		let matches = msg.match(mentionRegex);
@@ -507,6 +729,12 @@ export class DiscordBot
 		return msg;
 	}
 
+	/*
+	Sends a message to Discord
+	@param {integer} index - The index of the channel to send the message to
+	@param {string} msg - The message to send
+	@returns {void}
+	 */
 	sendMessage(index, msg)
 	{
 		if(index < 0 || index >= this.channels.length || !msg)
@@ -528,6 +756,11 @@ export class DiscordBot
 		}).bind(this));
 	}
 
+	/*
+	Decides whether a given message is valid or not
+	@param {Message} msg - The message
+	@returns {boolean}
+	 */
 	validMessage(msg)
 	{
 		return !(msg.author.id === this.bot.user.id || discordIgnore.find((id) => id === msg.author.id));

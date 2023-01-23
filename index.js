@@ -9,8 +9,6 @@ const splitRegex = /,\s*/ig;
 const bots = [];
 export const debug = process.env["DEBUG"];
 
-const appId = process.env["APP_ID"];
-const appSecret = process.env["APP_SECRET"];
 const token = process.env["BOT_TOKEN"];
 const guildSnowflake = process.env["DISCORD_SERVER"];
 const channelSnowflakes = process.env["DISCORD_CHANNELS"].split(splitRegex);
@@ -25,6 +23,10 @@ initBots();
 await connectBots();
 await startListening();
 
+/*
+Initialises the bots with their necessary login info
+@return {void}
+ */
 function initBots()
 {
 	const slBot = new SLBot(firstName, lastName, slPassword, groups);
@@ -35,6 +37,10 @@ function initBots()
 	bots.push(discordBot);
 }
 
+/*
+Connects the bots to their respective servers
+@return {void}
+ */
 async function connectBots()
 {
 	for(const bot of bots)
@@ -43,6 +49,10 @@ async function connectBots()
 	}
 }
 
+/*
+Starts the bots listening
+@return {void}
+ */
 async function startListening()
 {
 	for(const bot of bots)
@@ -51,16 +61,25 @@ async function startListening()
 	}
 }
 
+/*
+Setup error handling.
+@return {void}
+ */
 function setupErrorHandling()
 {
-	process.on("exit", onError);
-	process.on("SIGINT", onError);
-	process.on("SIGUSR1", onError);
-	process.on("SIGUSR2", onError);
-	process.on("uncaughtException", onError);
+	process.on("exit", onFatalError);
+	process.on("SIGINT", onFatalError);
+	process.on("SIGUSR1", onFatalError);
+	process.on("SIGUSR2", onFatalError);
+	process.on("uncaughtException", onFatalError);
 }
 
-async function onError(err)
+/*
+	Called on fatal error - print the error and disconnect.
+	@param {Object|string} err - Error object/string
+	@returns {Promise<void>}
+ */
+async function onFatalError(err)
 {
 	if(err)
 	{
@@ -73,5 +92,4 @@ async function onError(err)
 	}
 
 	process.exit(1);
-	return;
 }
