@@ -1,13 +1,16 @@
 import chalk               from "chalk";
 import * as dotenv         from "dotenv";
 import {DiscordBot, SLBot} from "./Bot.js";
+import {log}               from "./Utils.js";
 
+// TODO: Add user masquerading
 dotenv.config();
 
 const splitRegex = /,\s*/ig;
 
 const bots = [];
 export const debug = process.env["DEBUG"];
+export const doLog = process.env["LOG_CHAT"];
 
 const token = process.env["BOT_TOKEN"];
 const guildSnowflake = process.env["DISCORD_SERVER"];
@@ -17,6 +20,7 @@ const groups = process.env["SL_GROUPS"].split(splitRegex);
 const firstName = process.env["SL_FIRST_NAME"];
 const lastName = process.env["SL_LAST_NAME"];
 const slPassword = process.env["SL_PASSWORD"];
+const retry = 60;
 
 setupErrorHandling();
 initBots();
@@ -67,11 +71,34 @@ Setup error handling.
  */
 function setupErrorHandling()
 {
-	process.on("exit", onFatalError);
-	process.on("SIGINT", onFatalError);
-	process.on("SIGUSR1", onFatalError);
-	process.on("SIGUSR2", onFatalError);
-	process.on("uncaughtException", onFatalError);
+	process.on("exit", fatalError);
+	process.on("SIGINT", checkConnections);
+	process.on("SIGUSR1", checkConnections);
+	process.on("SIGUSR2", checkConnections);
+	process.on("uncaughtException", checkConnections);
+}
+
+/*
+Checks the connections of all the bots and reconnects if need be
+@description This promise can be safely ignored due to async functionality
+@returns {Promise<void>}
+ */
+async function checkConnections()
+{
+	log("Something went wrong, checking connections in " + retry + " seconds");
+
+	setTimeout(function(){
+		for( const bot of bots )
+		{
+			if( bot.connected )
+			{
+				continue;
+			}
+
+			bot.connect();
+			bot.listen();
+		}
+	},retry*1000);
 }
 
 /*
@@ -79,7 +106,7 @@ function setupErrorHandling()
 	@param {Object|string} err - Error object/string
 	@returns {Promise<void>}
  */
-async function onFatalError(err)
+async function fatalError(err)
 {
 	if(err)
 	{

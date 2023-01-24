@@ -1,8 +1,8 @@
 import nmv, {UUID}  from "@caspertech/node-metaverse";
 import chalk        from "chalk";
 import * as Discord from "discord.js";
-import {debug}      from "./index.js";
-import {doPrint}    from "./Utils.js";
+import {debug}        from "./index.js";
+import {doPrint, log} from "./Utils.js";
 
 const slPerms = nmv.BotOptionFlags.LiteObjectStore | nmv.BotOptionFlags.StoreMyAttachmentsOnly;
 const mentionRegex = /@(\S+)/ig;
@@ -46,6 +46,13 @@ class Bot
 	@description This is managed in the superclass (Bot) but is also used in subclasses
 	 */
 	dest;
+
+	/*
+	Whether or not the bot is connected
+	@type {boolean}
+	@description This should be managed by subclasses
+	 */
+	connected;
 
 	/*
 	Formats a message
@@ -189,9 +196,12 @@ export class SLBot
 		loginParameters.firstName = this.firstName;
 		loginParameters.lastName = this.lastName;
 		loginParameters.password = this.password;
-		//loginParameters.start = "last";
 
-		this.bot = new nmv.Bot(loginParameters, slPerms);
+		if( !this.bot )
+		{
+			this.bot = new nmv.Bot(loginParameters, slPerms);
+		}
+
 		this.print("Logging in");
 		await this.bot.login();
 		this.print("Logged in");
@@ -199,6 +209,7 @@ export class SLBot
 		this.print("Waiting for event queue");
 		await this.bot.waitForEventQueue();
 		this.print("Connected to sim");
+		this.connected = true;
 	}
 
 	/*
@@ -217,6 +228,8 @@ export class SLBot
 		{
 			this.print(`<${chalk.red("Error")}> Problem exiting ${this.botType.header} - `, error);
 		}
+
+		this.connected = false;
 	}
 
 	/*
@@ -273,6 +286,7 @@ export class SLBot
 
 	/*
 	Group chat event callback
+	@description This promise can be safely ignored due to async functionality
 	@param {object} event - The event
 	@returns {void}
 	 */
@@ -320,6 +334,7 @@ export class SLBot
 			return;
 		}
 
+		log(msg);
 		this.printDebug("Attempting message -- " + index + ", '" + msg + "' to " + this.groups[index]);
 		this.printDebug("Comms: ", this.bot.clientCommands.comms.sendGroupMessage);
 		//this.printDebug("Commands: ",this.bot.clientCommands);
@@ -400,28 +415,39 @@ export class DiscordBot
 	{
 		const Intents = Discord.GatewayIntentBits;
 
-		//console.log(Discord.GatewayIntentBits);
-		this.bot = new Discord.Client({
-			                              intents: [Intents.Guilds, Intents.GuildMembers, Intents.GuildBans,
-			                                        Intents.GuildEmojisAndStickers, Intents.GuildIntegrations,
-			                                        Intents.GuildWebhooks, Intents.GuildInvites,
-			                                        Intents.GuildVoiceStates, Intents.GuildPresences,
-			                                        Intents.GuildMessages, Intents.GuildMessageReactions,
-			                                        Intents.GuildMessageTyping, Intents.DirectMessages,
-			                                        Intents.DirectMessageReactions, Intents.DirectMessageTyping,
-			                                        Intents.MessageContent]
-		                              });
+		if( !this.bot )
+		{
+			this.bot = new Discord.Client({
+				                              intents: [Intents.Guilds, Intents.GuildMembers, Intents.GuildBans,
+				                                        Intents.GuildEmojisAndStickers, Intents.GuildIntegrations,
+				                                        Intents.GuildWebhooks, Intents.GuildInvites,
+				                                        Intents.GuildVoiceStates, Intents.GuildPresences,
+				                                        Intents.GuildMessages, Intents.GuildMessageReactions,
+				                                        Intents.GuildMessageTyping, Intents.DirectMessages,
+				                                        Intents.DirectMessageReactions, Intents.DirectMessageTyping,
+				                                        Intents.MessageContent]
+			                              });
+		}
 
 		this.print("Logging in");
 		await this.bot.login(this.token);
 
-		this.guild = await this.bot.guilds.fetch(this.guildSnowflake);
-		this.channels = [];
-
-		for(const channel of this.channelSnowflakes)
+		if( !this.guild )
 		{
-			this.channels.push(await this.guild.channels.fetch(channel));
+			this.guild = await this.bot.guilds.fetch(this.guildSnowflake);
 		}
+
+		if( !this.channels )
+		{
+			this.channels = [];
+
+			for(const channel of this.channelSnowflakes)
+			{
+				this.channels.push(await this.guild.channels.fetch(channel));
+			}
+		}
+
+		this.connected = true;
 	}
 
 	/*
@@ -440,6 +466,8 @@ export class DiscordBot
 		{
 			this.print(`<${chalk.red("Error")}> Problem exiting ${this.botType.header} - `, error);
 		}
+
+		this.connected = false;
 	}
 
 	/*
@@ -491,6 +519,7 @@ export class DiscordBot
 
 	/*
 	Called when a message is created/sent
+	@description This promise can be safely ignored due to async functionality
 	@param {Message} msg - The message sent
 	@returns {Promise<void>}
 	 */
@@ -522,6 +551,7 @@ export class DiscordBot
 
 	/*
 	 Called when a message is deleted
+	 @description This promise can be safely ignored due to async functionality
 	 @param {Message} msg - The message deleted
 	 @returns {Promise<void>}
 	 */
@@ -564,6 +594,7 @@ export class DiscordBot
 
 	/*
 	 Called when a message is updated
+	 @description This promise can be safely ignored due to async functionality
 	 @param {Message} oldMessage - The old message
 	 @param {Message} newMessage - The new message
 	 @returns {Promise<void>}
@@ -597,6 +628,7 @@ export class DiscordBot
 	/*
 	 Called when a reaction is added
 	 @description The user is ignored because it's present in the message
+	 @description This promise can be safely ignored due to async functionality
 	 @param {Reaction} reaction - The reaction added
 	 @param {User} [user] - The user who added the reaction
 	 @returns {Promise<void>}
@@ -614,6 +646,7 @@ export class DiscordBot
 		const text = msg.content;
 		const sender = await this.getDisplayName(msg.author.id);
 		const emoji = reaction.emoji.name;
+		this.printDebug("Emoji: ", reaction.emoji);
 		const index = this.findIndex(msg.channelId);
 
 		if(index < 0)
@@ -628,6 +661,7 @@ export class DiscordBot
 	/*
 	 Called when a reaction is removed
 	 @description The user is ignored because it's present in the message
+	 @description This promise can be safely ignored due to async functionality
 	 @param {Reaction} reaction - The reaction removed
 	 @param {User} [user] - The user who added the reaction
 	 @returns {Promise<void>}
@@ -672,6 +706,7 @@ export class DiscordBot
 
 	/*
 	 Called when a bot removes an emoji
+	 @description This promise can be safely ignored due to async functionality
 	 @param {Reaction} reaction - The emoji removed
 	 @returns {Promise<void>}
 	 */
@@ -706,24 +741,22 @@ export class DiscordBot
 	 */
 	async processMentions(msg)
 	{
-		let matches = msg.match(mentionRegex);
+		let matches = msg.matchAll(mentionRegex);
 
-		while(matches)
+		for( const match of matches )
 		{
-			this.printDebug("Found mention: ", matches[0]);
+			this.printDebug("Found mention: "+  match[0] + " (" + match[1] + ")" );
 
-			const username = matches[1];
-			const member = await this.guild.members.fetch({
-				                                              query: username,
+			const memberId = (await this.guild.members.fetch({
+				                                              query: match[1],
 				                                              limit: 1
-			                                              });
+			                                              })).keys().next().value;
 
-			if(member)
+			if(memberId)
 			{
-				msg = msg.replaceAll(matches[0], `<@${member.id}>`);
+				this.printDebug(match[0] + " -> " + `<@${memberId}> :`, memberId);
+				msg = msg.replaceAll(match[0], `<@${memberId}>`);
 			}
-
-			matches = msg.match(mentionRegex);
 		}
 
 		return msg;
@@ -744,6 +777,8 @@ export class DiscordBot
 		}
 
 		this.print(msg);
+		log(msg);
+
 		// Mentions need to be processed before the message is sent
 		// But the message does not need to be sent before this method is called again
 		// Thus, process the promise from processMentions but ignore the one from send
@@ -751,6 +786,7 @@ export class DiscordBot
 		{
 			this.printDebug("Index: " + index);
 			this.printDebug("Channel: ", this.channels[index]);
+
 			// Promise ignored; async is desired here
 			this.channels[index].send(msg2);
 		}).bind(this));
@@ -763,6 +799,18 @@ export class DiscordBot
 	 */
 	validMessage(msg)
 	{
-		return !(msg.author.id === this.bot.user.id || discordIgnore.find((id) => id === msg.author.id));
+		if( msg.author.id === this.bot.user.id )
+		{
+			this.printDebug("Invalid message - from me");
+			return false;
+		}
+
+		if( discordIgnore.find((id) => id === msg.author.id) )
+		{
+			this.printDebug( "Invalid message - ignored id");
+			return false;
+		}
+
+		return true;
 	}
 }
